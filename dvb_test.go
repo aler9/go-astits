@@ -38,7 +38,7 @@ func TestParseDVBDurationSeconds(t *testing.T) {
 
 func TestWriteDVBTime(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writeDVBTime(w, dvbTime)
 	assert.NoError(t, err)
 	assert.Equal(t, n, buf.Len())
@@ -47,7 +47,7 @@ func TestWriteDVBTime(t *testing.T) {
 
 func TestWriteDVBDurationMinutes(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writeDVBDurationMinutes(w, dvbDurationMinutes)
 	assert.NoError(t, err)
 	assert.Equal(t, n, buf.Len())
@@ -56,7 +56,7 @@ func TestWriteDVBDurationMinutes(t *testing.T) {
 
 func TestWriteDVBDurationSeconds(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writeDVBDurationSeconds(w, dvbDurationSeconds)
 	assert.NoError(t, err)
 	assert.Equal(t, n, buf.Len())

@@ -626,7 +626,7 @@ func TestWriteDescriptorOneByOne(t *testing.T) {
 			tc.bytesFunc(wExpected)
 
 			bufActual := bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+			wActual := newLightweightBitsWriter(&bufActual)
 			n, err := writeDescriptor(wActual, &tc.desc)
 			assert.NoError(t, err)
 			assert.Equal(t, n, bufActual.Len())
@@ -654,7 +654,7 @@ func TestWriteDescriptorAll(t *testing.T) {
 	descBytes[1] = byte(descLen & 0xff)
 
 	bufActual := bytes.Buffer{}
-	wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+	wActual := newLightweightBitsWriter(&bufActual)
 
 	n, err := writeDescriptorsWithLength(wActual, dss)
 	assert.NoError(t, err)
@@ -666,7 +666,7 @@ func TestWriteDescriptorAll(t *testing.T) {
 func BenchmarkWriteDescriptor(b *testing.B) {
 	buf := bytes.Buffer{}
 	buf.Grow(1024)
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &buf})
+	w := newLightweightBitsWriter(&buf)
 
 	for _, bm := range descriptorTestTable {
 		b.Run(bm.name, func(b *testing.B) {

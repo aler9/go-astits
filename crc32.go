@@ -16,3 +16,29 @@ func updateCRC32(crc32 uint32, bs []byte) uint32 {
 	}
 	return crc32
 }
+
+type crc32Writer struct {
+	w       *lightweightBitsWriter
+	current uint32
+}
+
+func newCRC32Writer(w *lightweightBitsWriter) *crc32Writer {
+	return &crc32Writer{
+		w:       w,
+		current: crc32Polynomial,
+	}
+}
+
+func (c *crc32Writer) Write(p []byte) (int, error) {
+	n := len(p)
+	c.w.WriteSlice(p)
+	err := c.w.Err()
+
+	c.current = updateCRC32(c.current, p)
+
+	return n, err
+}
+
+func (c *crc32Writer) Sum32() uint32 {
+	return c.current
+}

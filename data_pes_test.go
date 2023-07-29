@@ -133,7 +133,7 @@ func TestWriteDSMTrickMode(t *testing.T) {
 			tc.bytesFunc(wExpected)
 
 			bufActual := &bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: bufActual})
+			wActual := newLightweightBitsWriter(bufActual)
 
 			n, err := writeDSMTrickMode(wActual, tc.trickMode)
 			assert.NoError(t, err)
@@ -182,7 +182,7 @@ func TestParsePTSOrDTS(t *testing.T) {
 
 func TestWritePTSOrDTS(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writePTSOrDTS(w, uint8(0b0010), dtsClockReference)
 	assert.NoError(t, err)
 	assert.Equal(t, n, 5)
@@ -213,7 +213,7 @@ func TestParseESCR(t *testing.T) {
 
 func TestWriteESCR(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writeESCR(w, clockReference)
 	assert.NoError(t, err)
 	assert.Equal(t, n, 6)
@@ -416,7 +416,7 @@ func TestWritePESData(t *testing.T) {
 			tc.bytesFunc(wExpected, false, false)
 
 			bufActual := bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+			wActual := newLightweightBitsWriter(&bufActual)
 
 			start := true
 			totalBytes := 0
@@ -453,7 +453,7 @@ func TestWritePESHeader(t *testing.T) {
 			tc.optionalHeaderBytesFunc(wExpected, false, false)
 
 			bufActual := bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+			wActual := newLightweightBitsWriter(&bufActual)
 
 			n, err := writePESHeader(wActual, tc.pesData.Header, len(tc.pesData.Data))
 			assert.NoError(t, err)
@@ -472,7 +472,7 @@ func TestWritePESOptionalHeader(t *testing.T) {
 			tc.optionalHeaderBytesFunc(wExpected, false, false)
 
 			bufActual := bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+			wActual := newLightweightBitsWriter(&bufActual)
 
 			n, err := writePESOptionalHeader(wActual, tc.pesData.Header.OptionalHeader)
 			assert.NoError(t, err)

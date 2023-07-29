@@ -485,16 +485,15 @@ func (d *PSIData) toData(firstPacket *Packet, pid uint16) (ds []*DemuxerData) {
 	return
 }
 
-func writePSIData(w *astikit.BitsWriter, d *PSIData) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-	b.Write(uint8(d.PointerField))
+func writePSIData(w *lightweightBitsWriter, d *PSIData) (int, error) {
+	w.WriteByte(uint8(d.PointerField))
 	for i := 0; i < d.PointerField; i++ {
-		b.Write(uint8(0x00))
+		w.WriteByte(uint8(0x00))
 	}
 
 	bytesWritten := 1 + d.PointerField
 
-	if err := b.Err(); err != nil {
+	if err := w.Err(); err != nil {
 		return 0, err
 	}
 
@@ -529,28 +528,25 @@ func calcPSISectionLength(s *PSISection) uint16 {
 	return ret
 }
 
-func writePSISection(w *astikit.BitsWriter, s *PSISection) (int, error) {
+func writePSISection(w *lightweightBitsWriter, s *PSISection) (int, error) {
 	if s.Header.TableID != PSITableIDPAT && s.Header.TableID != PSITableIDPMT {
 		return 0, fmt.Errorf("writePSISection: table %s is not implemented", s.Header.TableID.Type())
 	}
 
-	b := astikit.NewBitsWriterBatch(w)
-
 	sectionLength := calcPSISectionLength(s)
-	sectionCRC32 := crc32Polynomial
+
+	var cw *crc32Writer
 
 	if s.Header.TableID.hasCRC32() {
-		w.SetWriteCallback(func(bs []byte) {
-			sectionCRC32 = updateCRC32(sectionCRC32, bs)
-		})
-		defer w.SetWriteCallback(nil)
+		cw = newCRC32Writer(w)
+		w = newLightweightBitsWriter(cw)
 	}
 
-	b.Write(uint8(s.Header.TableID))
-	b.Write(s.Header.SectionSyntaxIndicator)
-	b.Write(s.Header.PrivateBit)
-	b.WriteN(uint8(0xff), 2)
-	b.WriteN(sectionLength, 12)
+	w.WriteByte(uint8(s.Header.TableID))
+	w.WriteBit(s.Header.SectionSyntaxIndicator)
+	w.WriteBit(s.Header.PrivateBit)
+	w.WriteBits(uint64(0xff), 2)
+	w.WriteBits(uint64(sectionLength), 12)
 	bytesWritten := 3
 
 	if s.Header.SectionLength > 0 {
@@ -561,15 +557,15 @@ func writePSISection(w *astikit.BitsWriter, s *PSISection) (int, error) {
 		bytesWritten += n
 
 		if s.Header.TableID.hasCRC32() {
-			b.Write(sectionCRC32)
+			w.WriteUint32(cw.Sum32())
 			bytesWritten += 4
 		}
 	}
 
-	return bytesWritten, b.Err()
+	return bytesWritten, w.Err()
 }
 
-func writePSISectionSyntax(w *astikit.BitsWriter, s *PSISection) (int, error) {
+func writePSISectionSyntax(w *lightweightBitsWriter, s *PSISection) (int, error) {
 	bytesWritten := 0
 	if s.Header.TableID.hasPSISyntaxHeader() {
 		n, err := writePSISectionSyntaxHeader(w, s.Syntax.Header)
@@ -588,20 +584,18 @@ func writePSISectionSyntax(w *astikit.BitsWriter, s *PSISection) (int, error) {
 	return bytesWritten, nil
 }
 
-func writePSISectionSyntaxHeader(w *astikit.BitsWriter, h *PSISectionSyntaxHeader) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
+func writePSISectionSyntaxHeader(w *lightweightBitsWriter, h *PSISectionSyntaxHeader) (int, error) {
+	w.WriteUint16(h.TableIDExtension)
+	w.WriteBits(uint64(0xff), 2)
+	w.WriteBits(uint64(h.VersionNumber), 5)
+	w.WriteBit(h.CurrentNextIndicator)
+	w.WriteByte(h.SectionNumber)
+	w.WriteByte(h.LastSectionNumber)
 
-	b.Write(h.TableIDExtension)
-	b.WriteN(uint8(0xff), 2)
-	b.WriteN(h.VersionNumber, 5)
-	b.Write(h.CurrentNextIndicator)
-	b.Write(h.SectionNumber)
-	b.Write(h.LastSectionNumber)
-
-	return 5, b.Err()
+	return 5, w.Err()
 }
 
-func writePSISectionSyntaxData(w *astikit.BitsWriter, d *PSISectionSyntaxData, tableID PSITableID) (int, error) {
+func writePSISectionSyntaxData(w *lightweightBitsWriter, d *PSISectionSyntaxData, tableID PSITableID) (int, error) {
 	switch tableID {
 	// TODO write other table types
 	case PSITableIDPAT:

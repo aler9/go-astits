@@ -362,7 +362,7 @@ func TestWritePSIData(t *testing.T) {
 			bufExpected := bytes.Buffer{}
 			wExpected := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufExpected})
 			bufActual := bytes.Buffer{}
-			wActual := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &bufActual})
+			wActual := newLightweightBitsWriter(&bufActual)
 
 			tc.bytesFunc(wExpected)
 

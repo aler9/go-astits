@@ -50,14 +50,12 @@ func calcPATSectionLength(d *PATData) uint16 {
 	return uint16(4 * len(d.Programs))
 }
 
-func writePATSection(w *astikit.BitsWriter, d *PATData) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writePATSection(w *lightweightBitsWriter, d *PATData) (int, error) {
 	for _, p := range d.Programs {
-		b.Write(p.ProgramNumber)
-		b.WriteN(uint8(0xff), 3)
-		b.WriteN(p.ProgramMapID, 13)
+		w.WriteUint16(p.ProgramNumber)
+		w.WriteBits(uint64(0xff), 3)
+		w.WriteBits(uint64(p.ProgramMapID), 13)
 	}
 
-	return len(d.Programs) * patSectionEntryBytesSize, b.Err()
+	return len(d.Programs) * patSectionEntryBytesSize, w.Err()
 }

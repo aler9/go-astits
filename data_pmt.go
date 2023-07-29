@@ -133,13 +133,11 @@ func calcPMTSectionLength(d *PMTData) uint16 {
 	return ret
 }
 
-func writePMTSection(w *astikit.BitsWriter, d *PMTData) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writePMTSection(w *lightweightBitsWriter, d *PMTData) (int, error) {
 	// TODO split into sections
 
-	b.WriteN(uint8(0xff), 3)
-	b.WriteN(d.PCRPID, 13)
+	w.WriteBits(uint64(0xff), 3)
+	w.WriteBits(uint64(d.PCRPID), 13)
 	bytesWritten := 2
 
 	n, err := writeDescriptorsWithLength(w, d.ProgramDescriptors)
@@ -149,9 +147,9 @@ func writePMTSection(w *astikit.BitsWriter, d *PMTData) (int, error) {
 	bytesWritten += n
 
 	for _, es := range d.ElementaryStreams {
-		b.Write(uint8(es.StreamType))
-		b.WriteN(uint8(0xff), 3)
-		b.WriteN(es.ElementaryPID, 13)
+		w.WriteByte(uint8(es.StreamType))
+		w.WriteBits(uint64(0xff), 3)
+		w.WriteBits(uint64(es.ElementaryPID), 13)
 		bytesWritten += 3
 
 		n, err = writeDescriptorsWithLength(w, es.ElementaryStreamDescriptors)
@@ -161,7 +159,7 @@ func writePMTSection(w *astikit.BitsWriter, d *PMTData) (int, error) {
 		bytesWritten += n
 	}
 
-	return bytesWritten, b.Err()
+	return bytesWritten, w.Err()
 }
 
 func (t StreamType) IsVideo() bool {

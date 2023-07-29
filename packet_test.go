@@ -67,7 +67,7 @@ func TestPayloadOffset(t *testing.T) {
 func TestWritePacket(t *testing.T) {
 	eb, ep := packet(packetHeader, *packetAdaptationField, []byte("payload"), false)
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	n, err := writePacket(w, ep, MpegTsPacketSize)
 	assert.NoError(t, err)
 	assert.Equal(t, MpegTsPacketSize, n)
@@ -83,7 +83,7 @@ func TestWritePacket_HeaderOnly(t *testing.T) {
 	_, ep := packetShort(shortPacketHeader, nil)
 
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 
 	n, err := writePacket(w, ep, MpegTsPacketSize)
 	assert.NoError(t, err)
@@ -130,7 +130,7 @@ func TestParsePacketHeader(t *testing.T) {
 
 func TestWritePacketHeader(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	bytesWritten, err := writePacketHeader(w, packetHeader)
 	assert.NoError(t, err)
 	assert.Equal(t, bytesWritten, 3)
@@ -206,7 +206,7 @@ func TestParsePacketAdaptationField(t *testing.T) {
 
 func TestWritePacketAdaptationField(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	eb := packetAdaptationFieldBytes(*packetAdaptationField)
 	bytesWritten, err := writePacketAdaptationField(w, packetAdaptationField)
 	assert.NoError(t, err)
@@ -237,7 +237,7 @@ func TestParsePCR(t *testing.T) {
 
 func TestWritePCR(t *testing.T) {
 	buf := &bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 	bytesWritten, err := writePCR(w, pcr)
 	assert.NoError(t, err)
 	assert.Equal(t, bytesWritten, 6)
@@ -248,7 +248,7 @@ func TestWritePCR(t *testing.T) {
 func BenchmarkWritePCR(b *testing.B) {
 	buf := &bytes.Buffer{}
 	buf.Grow(6)
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: buf})
+	w := newLightweightBitsWriter(buf)
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

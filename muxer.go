@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"io"
-
-	"github.com/asticode/go-astikit"
 )
 
 const (
@@ -24,7 +22,7 @@ var (
 type Muxer struct {
 	ctx        context.Context
 	w          io.Writer
-	bitsWriter *astikit.BitsWriter
+	bitsWriter *lightweightBitsWriter
 
 	packetSize             int
 	tablesRetransmitPeriod int // period in PES packets
@@ -43,7 +41,7 @@ type Muxer struct {
 	pmtBytes bytes.Buffer
 
 	buf       bytes.Buffer
-	bufWriter *astikit.BitsWriter
+	bufWriter *lightweightBitsWriter
 
 	// We use map[uint32] instead map[uint16] as go runtime provide optimized hash functions for (u)int32/64 keys
 	esContexts              map[uint32]*esContext
@@ -94,8 +92,8 @@ func NewMuxer(ctx context.Context, w io.Writer, opts ...func(*Muxer)) *Muxer {
 		esContexts: map[uint32]*esContext{},
 	}
 
-	m.bufWriter = astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &m.buf})
-	m.bitsWriter = astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: m.w})
+	m.bufWriter = newLightweightBitsWriter(&m.buf)
+	m.bitsWriter = newLightweightBitsWriter(m.w)
 
 	// TODO multiple programs support
 	m.pm.setUnlocked(pmtStartPID, programNumberStart)
@@ -352,13 +350,13 @@ func (m *Muxer) generatePAT() error {
 	}
 
 	m.buf.Reset()
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &m.buf})
+	w := newLightweightBitsWriter(&m.buf)
 	if _, err := writePSIData(w, &psiData); err != nil {
 		return err
 	}
 
 	m.patBytes.Reset()
-	wPacket := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &m.patBytes})
+	wPacket := newLightweightBitsWriter(&m.patBytes)
 
 	pkt := Packet{
 		Header: PacketHeader{
@@ -420,13 +418,13 @@ func (m *Muxer) generatePMT() error {
 	}
 
 	m.buf.Reset()
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &m.buf})
+	w := newLightweightBitsWriter(&m.buf)
 	if _, err := writePSIData(w, &psiData); err != nil {
 		return err
 	}
 
 	m.pmtBytes.Reset()
-	wPacket := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &m.pmtBytes})
+	wPacket := newLightweightBitsWriter(&m.pmtBytes)
 
 	pkt := Packet{
 		Header: PacketHeader{

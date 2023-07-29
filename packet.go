@@ -322,10 +322,8 @@ func parsePCR(i *astikit.BytesIterator) (cr *ClockReference, err error) {
 	return
 }
 
-func writePacket(w *astikit.BitsWriter, p *Packet, targetPacketSize int) (written int, retErr error) {
-	if retErr = w.Write(uint8(syncByte)); retErr != nil {
-		return
-	}
+func writePacket(w *lightweightBitsWriter, p *Packet, targetPacketSize int) (written int, retErr error) {
+	w.WriteByte(uint8(syncByte))
 	written += 1
 
 	n, retErr := writePacketHeader(w, p.Header)
@@ -351,45 +349,36 @@ func writePacket(w *astikit.BitsWriter, p *Packet, targetPacketSize int) (writte
 	}
 
 	if p.Header.HasPayload {
-		retErr = w.Write(p.Payload)
-		if retErr != nil {
-			return
-		}
+		w.WriteSlice(p.Payload)
 		written += len(p.Payload)
 	}
 
 	for written < targetPacketSize {
-		if retErr = w.Write(uint8(0xff)); retErr != nil {
-			return
-		}
+		w.WriteByte(uint8(0xff))
 		written++
 	}
 
-	return written, nil
+	return written, w.Err()
 }
 
-func writePacketHeader(w *astikit.BitsWriter, h PacketHeader) (written int, retErr error) {
-	b := astikit.NewBitsWriterBatch(w)
+func writePacketHeader(w *lightweightBitsWriter, h PacketHeader) (written int, retErr error) {
+	w.WriteBit(h.TransportErrorIndicator)
+	w.WriteBit(h.PayloadUnitStartIndicator)
+	w.WriteBit(h.TransportPriority)
+	w.WriteBits(uint64(h.PID), 13)
+	w.WriteBits(uint64(h.TransportScramblingControl), 2)
+	w.WriteBit(h.HasAdaptationField) // adaptation_field_control higher bit
+	w.WriteBit(h.HasPayload)         // adaptation_field_control lower bit
+	w.WriteBits(uint64(h.ContinuityCounter), 4)
 
-	b.Write(h.TransportErrorIndicator)
-	b.Write(h.PayloadUnitStartIndicator)
-	b.Write(h.TransportPriority)
-	b.WriteN(h.PID, 13)
-	b.WriteN(h.TransportScramblingControl, 2)
-	b.Write(h.HasAdaptationField) // adaptation_field_control higher bit
-	b.Write(h.HasPayload)         // adaptation_field_control lower bit
-	b.WriteN(h.ContinuityCounter, 4)
-
-	return mpegTsPacketHeaderSize, b.Err()
+	return mpegTsPacketHeaderSize, w.Err()
 }
 
-func writePCR(w *astikit.BitsWriter, cr *ClockReference) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-
-	b.WriteN(uint64(cr.Base), 33)
-	b.WriteN(uint8(0xff), 6)
-	b.WriteN(uint64(cr.Extension), 9)
-	return pcrBytesSize, b.Err()
+func writePCR(w *lightweightBitsWriter, cr *ClockReference) (int, error) {
+	w.WriteBits(uint64(cr.Base), 33)
+	w.WriteBits(uint64(0xff), 6)
+	w.WriteBits(uint64(cr.Extension), 9)
+	return pcrBytesSize, w.Err()
 }
 
 func calcPacketAdaptationFieldLength(af *PacketAdaptationField) (length uint8) {
@@ -413,26 +402,24 @@ func calcPacketAdaptationFieldLength(af *PacketAdaptationField) (length uint8) {
 	return
 }
 
-func writePacketAdaptationField(w *astikit.BitsWriter, af *PacketAdaptationField) (bytesWritten int, retErr error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writePacketAdaptationField(w *lightweightBitsWriter, af *PacketAdaptationField) (bytesWritten int, retErr error) {
 	if af.IsOneByteStuffing {
-		b.Write(uint8(0))
+		w.WriteByte(uint8(0))
 		return 1, nil
 	}
 
 	length := calcPacketAdaptationFieldLength(af)
-	b.Write(length)
+	w.WriteByte(length)
 	bytesWritten++
 
-	b.Write(af.DiscontinuityIndicator)
-	b.Write(af.RandomAccessIndicator)
-	b.Write(af.ElementaryStreamPriorityIndicator)
-	b.Write(af.HasPCR)
-	b.Write(af.HasOPCR)
-	b.Write(af.HasSplicingCountdown)
-	b.Write(af.HasTransportPrivateData)
-	b.Write(af.HasAdaptationExtensionField)
+	w.WriteBit(af.DiscontinuityIndicator)
+	w.WriteBit(af.RandomAccessIndicator)
+	w.WriteBit(af.ElementaryStreamPriorityIndicator)
+	w.WriteBit(af.HasPCR)
+	w.WriteBit(af.HasOPCR)
+	w.WriteBit(af.HasSplicingCountdown)
+	w.WriteBit(af.HasTransportPrivateData)
+	w.WriteBit(af.HasAdaptationExtensionField)
 
 	bytesWritten++
 
@@ -453,16 +440,16 @@ func writePacketAdaptationField(w *astikit.BitsWriter, af *PacketAdaptationField
 	}
 
 	if af.HasSplicingCountdown {
-		b.Write(uint8(af.SpliceCountdown))
+		w.WriteByte(uint8(af.SpliceCountdown))
 		bytesWritten++
 	}
 
 	if af.HasTransportPrivateData {
 		// we can get length from TransportPrivateData itself, why do we need separate field?
-		b.Write(uint8(af.TransportPrivateDataLength))
+		w.WriteByte(uint8(af.TransportPrivateDataLength))
 		bytesWritten++
 		if af.TransportPrivateDataLength > 0 {
-			b.Write(af.TransportPrivateData)
+			w.WriteSlice(af.TransportPrivateData)
 		}
 		bytesWritten += len(af.TransportPrivateData)
 	}
@@ -477,11 +464,11 @@ func writePacketAdaptationField(w *astikit.BitsWriter, af *PacketAdaptationField
 
 	// stuffing
 	for i := 0; i < af.StuffingLength; i++ {
-		b.Write(uint8(0xff))
+		w.WriteByte(uint8(0xff))
 		bytesWritten++
 	}
 
-	retErr = b.Err()
+	retErr = w.Err()
 	return
 }
 
@@ -499,28 +486,26 @@ func calcPacketAdaptationFieldExtensionLength(afe *PacketAdaptationExtensionFiel
 	return length
 }
 
-func writePacketAdaptationFieldExtension(w *astikit.BitsWriter, afe *PacketAdaptationExtensionField) (bytesWritten int, retErr error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writePacketAdaptationFieldExtension(w *lightweightBitsWriter, afe *PacketAdaptationExtensionField) (bytesWritten int, retErr error) {
 	length := calcPacketAdaptationFieldExtensionLength(afe)
-	b.Write(length)
+	w.WriteByte(length)
 	bytesWritten++
 
-	b.Write(afe.HasLegalTimeWindow)
-	b.Write(afe.HasPiecewiseRate)
-	b.Write(afe.HasSeamlessSplice)
-	b.WriteN(uint8(0xff), 5) // reserved
+	w.WriteBit(afe.HasLegalTimeWindow)
+	w.WriteBit(afe.HasPiecewiseRate)
+	w.WriteBit(afe.HasSeamlessSplice)
+	w.WriteBits(uint64(0xff), 5) // reserved
 	bytesWritten++
 
 	if afe.HasLegalTimeWindow {
-		b.Write(afe.LegalTimeWindowIsValid)
-		b.WriteN(afe.LegalTimeWindowOffset, 15)
+		w.WriteBit(afe.LegalTimeWindowIsValid)
+		w.WriteBits(uint64(afe.LegalTimeWindowOffset), 15)
 		bytesWritten += 2
 	}
 
 	if afe.HasPiecewiseRate {
-		b.WriteN(uint8(0xff), 2)
-		b.WriteN(afe.PiecewiseRate, 22)
+		w.WriteBits(uint64(0xff), 2)
+		w.WriteBits(uint64(afe.PiecewiseRate), 22)
 		bytesWritten += 3
 	}
 
@@ -532,7 +517,7 @@ func writePacketAdaptationFieldExtension(w *astikit.BitsWriter, afe *PacketAdapt
 		bytesWritten += n
 	}
 
-	retErr = b.Err()
+	retErr = w.Err()
 	return
 }
 

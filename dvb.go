@@ -74,7 +74,7 @@ func parseDVBDurationByte(i byte) time.Duration {
 	return time.Duration(uint8(i)>>4*10 + uint8(i)&0xf)
 }
 
-func writeDVBTime(w *astikit.BitsWriter, t time.Time) (int, error) {
+func writeDVBTime(w *lightweightBitsWriter, t time.Time) (int, error) {
 	year := t.Year() - 1900
 	month := t.Month()
 	day := t.Day()
@@ -88,41 +88,35 @@ func writeDVBTime(w *astikit.BitsWriter, t time.Time) (int, error) {
 
 	d := t.Sub(t.Truncate(24 * time.Hour))
 
-	b := astikit.NewBitsWriterBatch(w)
-
-	b.Write(uint16(mjd))
+	w.WriteUint16(uint16(mjd))
 	bytesWritten, err := writeDVBDurationSeconds(w, d)
 	if err != nil {
 		return 2, err
 	}
 
-	return bytesWritten + 2, b.Err()
+	return bytesWritten + 2, w.Err()
 }
 
-func writeDVBDurationMinutes(w *astikit.BitsWriter, d time.Duration) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writeDVBDurationMinutes(w *lightweightBitsWriter, d time.Duration) (int, error) {
 	hours := uint8(d.Hours())
 	minutes := uint8(int(d.Minutes()) % 60)
 
-	b.Write(dvbDurationByteRepresentation(hours))
-	b.Write(dvbDurationByteRepresentation(minutes))
+	w.WriteByte(dvbDurationByteRepresentation(hours))
+	w.WriteByte(dvbDurationByteRepresentation(minutes))
 
-	return 2, b.Err()
+	return 2, w.Err()
 }
 
-func writeDVBDurationSeconds(w *astikit.BitsWriter, d time.Duration) (int, error) {
-	b := astikit.NewBitsWriterBatch(w)
-
+func writeDVBDurationSeconds(w *lightweightBitsWriter, d time.Duration) (int, error) {
 	hours := uint8(d.Hours())
 	minutes := uint8(int(d.Minutes()) % 60)
 	seconds := uint8(int(d.Seconds()) % 60)
 
-	b.Write(dvbDurationByteRepresentation(hours))
-	b.Write(dvbDurationByteRepresentation(minutes))
-	b.Write(dvbDurationByteRepresentation(seconds))
+	w.WriteByte(dvbDurationByteRepresentation(hours))
+	w.WriteByte(dvbDurationByteRepresentation(minutes))
+	w.WriteByte(dvbDurationByteRepresentation(seconds))
 
-	return 3, b.Err()
+	return 3, w.Err()
 }
 
 func dvbDurationByteRepresentation(n uint8) uint8 {

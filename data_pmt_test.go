@@ -43,7 +43,7 @@ func TestParsePMTSection(t *testing.T) {
 
 func TestWritePMTSection(t *testing.T) {
 	buf := bytes.Buffer{}
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: &buf})
+	w := newLightweightBitsWriter(&buf)
 	n, err := writePMTSection(w, pmt)
 	assert.NoError(t, err)
 	assert.Equal(t, n, buf.Len())
@@ -64,7 +64,7 @@ func BenchmarkWritePMTSection(b *testing.B) {
 
 	bw := &bytes.Buffer{}
 	bw.Grow(1024)
-	w := astikit.NewBitsWriter(astikit.BitsWriterOptions{Writer: bw})
+	w := newLightweightBitsWriter(bw)
 
 	for i := 0; i < b.N; i++ {
 		bw.Reset()
